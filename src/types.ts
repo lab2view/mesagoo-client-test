@@ -85,3 +85,7 @@ export interface BulkMessageCsv {
   created_at: string;
   updated_at: string;
 }
+
+export interface BulkMessageMapping {
+  [key: string]: string | null;
+}

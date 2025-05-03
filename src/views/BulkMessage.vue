@@ -247,6 +247,7 @@ import {
   MessageGateway,
   BulkMessageCsv,
   BulkMessageCsvStatusEnum,
+  BulkMessageMapping,
 } from "../types";
 import {
   fetchMessageGateways,
@@ -300,7 +301,7 @@ export default defineComponent({
       text: "",
     });
 
-    const mapping = reactive<Record<string, string>>({
+    const mapping = reactive<BulkMessageMapping>({
       phone: "",
     });
 
@@ -545,7 +546,7 @@ export default defineComponent({
           payload.append("text", formData.text);
         }
 
-        const mappingObj = {};
+        const mappingObj: BulkMessageMapping = {};
         Object.keys(mapping).forEach((key) => {
           if (mapping[key]) {
             mappingObj[key] = mapping[key];

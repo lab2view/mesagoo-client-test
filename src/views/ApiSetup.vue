@@ -50,20 +50,20 @@ import { fetchMessageGateways } from "../api";
 export default defineComponent({
   name: "ApiSetup",
   emits: ["authenticated"],
-  setup(props, { emit }) {
+  setup(_props, { emit }) {
     const router = useRouter();
     const form = ref(null);
     const isLoading = ref(false);
     const error = ref("");
 
-    const defaultEnvironment = {
-      name: "Default",
-      baseUrl: "",
-      endpoints: {
-        single: "/messages/single",
-        bulk: "/messages/bulk",
-      },
-    };
+    // const defaultEnvironment = {
+    //   name: "Default",
+    //   baseUrl: "",
+    //   endpoints: {
+    //     single: "/messages/single",
+    //     bulk: "/messages/bulk",
+    //   },
+    // };
 
     const apiSettings = reactive({
       baseUrl: localStorage.getItem("sms_gateway_base_url") || "",

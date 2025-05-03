@@ -62,7 +62,7 @@
 
             <v-row>
               <v-col
-                v-for="(field, index) in formData.data"
+                v-for="(_field, index) in formData.data"
                 :key="index"
                 cols="12"
                 sm="6"
@@ -112,7 +112,7 @@
 <script lang="ts">
 import { defineComponent, ref, reactive, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { FormStatus, Template } from "../types";
+import { FormStatus } from "../types";
 import { fetchSenders, fetchTemplate, updateTemplate } from "../api";
 
 export default defineComponent({
