@@ -77,7 +77,7 @@ export async function fetchTemplate(id: string): Promise<Template> {
   }
 
   const result = await response.json();
-  return result.data || {};
+  return result || {};
 }
 
 export async function createTemplate(
