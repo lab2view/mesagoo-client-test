@@ -33,11 +33,11 @@
         ></v-select>
 
         <v-select
-          v-model="formData.message_gateway_id"
+          v-model="formData.message_gateway_code"
           label="Message Gateway"
           :items="messageGateways"
           item-title="label"
-          item-value="id"
+          item-value="code"
           :rules="[rules.required]"
           :loading="loadingGateways"
           :disabled="loadingGateways"
@@ -61,11 +61,11 @@
 
         <v-select
           v-if="formData.message_type === 'template'"
-          v-model="formData.template_id"
+          v-model="formData.template_code"
           label="Template"
           :items="templates"
           item-title="label"
-          item-value="id"
+          item-value="code"
           :rules="[rules.required]"
           :loading="loadingTemplates"
           :disabled="loadingTemplates"
@@ -81,6 +81,16 @@
           rows="3"
         ></v-textarea>
 
+        <v-select
+          v-if="formData.message_type === 'template'"
+          v-model="formData.lang"
+          label="Language (Optional)"
+          :items="languageOptions"
+          item-title="text"
+          item-value="value"
+          clearable
+        ></v-select>
+
         <v-card
           class="mb-4 pa-4"
           v-if="formData.message_type === 'template' && selectedTemplate"
@@ -94,7 +104,7 @@
           <v-row>
             <v-col cols="12">
               <v-text-field
-                v-model="mapping.phone"
+                v-model="mapping._l2v_phone"
                 label="Phone Column"
                 :items="csvHeaders"
                 :rules="[rules.required]"
@@ -119,21 +129,6 @@
           </v-row>
         </v-card>
 
-        <v-card class="mb-4 pa-4" v-if="formData.message_type === 'text'">
-          <v-card-title>Phone Column Mapping</v-card-title>
-          <v-card-subtitle
-            >Select the CSV column containing phone numbers</v-card-subtitle
-          >
-
-          <v-text-field
-            v-model="mapping.phone"
-            label="Phone Column"
-            :items="csvHeaders"
-            :rules="[rules.required]"
-            placeholder="Select the CSV column for phone numbers"
-          ></v-text-field>
-        </v-card>
-
         <v-alert
           v-if="status"
           :type="status.success ? 'success' : 'error'"
@@ -142,11 +137,31 @@
           {{ status.message }}
           <div v-if="status.success && lastBulkCsvId" class="mt-2">
             <v-btn
+              color="primary"
+              size="small"
+              @click="getCsvDetails"
+              :loading="loadingDetails"
+              :disabled="loadingDetails"
+              class="mr-2"
+            >
+              View Details
+            </v-btn>
+            <v-btn
+              color="warning"
+              size="small"
+              @click="validateBulkCsv"
+              :loading="validating"
+              :disabled="validating || csvValidated"
+              class="mr-2"
+            >
+              Validate CSV
+            </v-btn>
+            <v-btn
               color="info"
               size="small"
               @click="processBulkCsv"
               :loading="processing"
-              :disabled="processing || csvProcessed"
+              :disabled="processing || !csvValidated || csvProcessed"
             >
               Process CSV
             </v-btn>
@@ -162,6 +177,136 @@
             </v-btn>
           </div>
         </v-alert>
+
+        <!-- CSV Details -->
+        <v-card v-if="csvDetails" class="mt-4 pa-4">
+          <v-card-title class="text-h6">CSV Details</v-card-title>
+          <v-card-text>
+            <v-row>
+              <v-col cols="12" md="6">
+                <v-list>
+                  <v-list-item>
+                    <v-list-item-title>ID</v-list-item-title>
+                    <v-list-item-subtitle>{{ csvDetails.id }}</v-list-item-subtitle>
+                  </v-list-item>
+                  <v-list-item>
+                    <v-list-item-title>Status</v-list-item-title>
+                    <v-list-item-subtitle>
+                      <v-chip
+                        :color="getStatusColor(csvDetails.status)"
+                        size="small"
+                        class="mt-1"
+                      >
+                        {{ csvDetails.status }}
+                      </v-chip>
+                    </v-list-item-subtitle>
+                  </v-list-item>
+                  <v-list-item>
+                    <v-list-item-title>Channel</v-list-item-title>
+                    <v-list-item-subtitle>{{ csvDetails.channel }}</v-list-item-subtitle>
+                  </v-list-item>
+                  <v-list-item>
+                    <v-list-item-title>Type</v-list-item-title>
+                    <v-list-item-subtitle>{{ csvDetails.type }}</v-list-item-subtitle>
+                  </v-list-item>
+                  <v-list-item v-if="csvDetails.text">
+                    <v-list-item-title>Text</v-list-item-title>
+                    <v-list-item-subtitle>{{ csvDetails.text }}</v-list-item-subtitle>
+                  </v-list-item>
+                </v-list>
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-list>
+                  <v-list-item v-if="csvDetails.message_gateway">
+                    <v-list-item-title>Message Gateway</v-list-item-title>
+                    <v-list-item-subtitle>{{ csvDetails.message_gateway.label }}</v-list-item-subtitle>
+                  </v-list-item>
+                  <v-list-item v-if="csvDetails.sender">
+                    <v-list-item-title>Sender</v-list-item-title>
+                    <v-list-item-subtitle>{{ csvDetails.sender.label }}</v-list-item-subtitle>
+                  </v-list-item>
+                  <v-list-item v-if="csvDetails.template">
+                    <v-list-item-title>Template</v-list-item-title>
+                    <v-list-item-subtitle>{{ csvDetails.template.label }}</v-list-item-subtitle>
+                  </v-list-item>
+                  <v-list-item>
+                    <v-list-item-title>Created At</v-list-item-title>
+                    <v-list-item-subtitle>{{ formatDate(csvDetails.created_at) }}</v-list-item-subtitle>
+                  </v-list-item>
+                  <v-list-item>
+                    <v-list-item-title>Updated At</v-list-item-title>
+                    <v-list-item-subtitle>{{ formatDate(csvDetails.updated_at) }}</v-list-item-subtitle>
+                  </v-list-item>
+                </v-list>
+              </v-col>
+            </v-row>
+
+            <v-expansion-panels class="mt-4">
+              <v-expansion-panel>
+                <v-expansion-panel-title>Mapping</v-expansion-panel-title>
+                <v-expansion-panel-text>
+                  <pre>{{ JSON.stringify(csvDetails.mapping, null, 2) }}</pre>
+                </v-expansion-panel-text>
+              </v-expansion-panel>
+              <v-expansion-panel v-if="csvDetails.summary">
+                <v-expansion-panel-title>Summary</v-expansion-panel-title>
+                <v-expansion-panel-text>
+                  <pre>{{ JSON.stringify(csvDetails.summary, null, 2) }}</pre>
+                </v-expansion-panel-text>
+              </v-expansion-panel>
+            </v-expansion-panels>
+
+            <div v-if="csvDetails.initial_url || csvDetails.formated_url" class="mt-4">
+              <div class="text-subtitle-1 mb-2">File URLs:</div>
+              <v-list>
+                <v-list-item v-if="csvDetails.initial_url">
+                  <v-list-item-title>Initial CSV</v-list-item-title>
+                  <v-list-item-subtitle>
+                    <a :href="csvDetails.initial_url" target="_blank">{{ csvDetails.initial_url }}</a>
+                  </v-list-item-subtitle>
+                </v-list-item>
+                <v-list-item v-if="csvDetails.formated_url">
+                  <v-list-item-title>Formatted CSV</v-list-item-title>
+                  <v-list-item-subtitle>
+                    <a :href="csvDetails.formated_url" target="_blank">{{ csvDetails.formated_url }}</a>
+                  </v-list-item-subtitle>
+                </v-list-item>
+              </v-list>
+            </div>
+          </v-card-text>
+        </v-card>
+
+        <v-card v-if="validationResult" class="mt-4 pa-4">
+          <v-card-title class="text-h6">CSV Validation Results</v-card-title>
+          <v-card-text>
+            <v-alert
+              :type="validationResult.valid ? 'success' : 'error'"
+              class="mb-4"
+            >
+              {{
+                validationResult.valid
+                  ? "CSV is valid and ready for processing"
+                  : "CSV validation failed"
+              }}
+            </v-alert>
+
+            <div
+              v-if="
+                validationResult.errors && validationResult.errors.length > 0
+              "
+            >
+              <div class="text-subtitle-1 mb-2">Validation Errors:</div>
+              <v-list>
+                <v-list-item
+                  v-for="(error, index) in validationResult.errors"
+                  :key="index"
+                >
+                  <v-list-item-title>{{ error }}</v-list-item-title>
+                </v-list-item>
+              </v-list>
+            </div>
+          </v-card-text>
+        </v-card>
 
         <v-card v-if="csvStatus" class="mt-4 pa-4">
           <v-card-title class="text-h6">CSV Processing Status</v-card-title>
@@ -247,7 +392,7 @@ import {
   MessageGateway,
   BulkMessageCsv,
   BulkMessageCsvStatusEnum,
-  BulkMessageMapping,
+  BulkMessageCsvDetails,
 } from "../types";
 import {
   fetchMessageGateways,
@@ -256,6 +401,8 @@ import {
   sendBulkMessages,
   processBulkMessageCsv,
   getBulkMessageCsvStatus,
+  validateBulkMessageCsv,
+  getBulkMessageCsvDetails,
 } from "../api";
 
 export default defineComponent({
@@ -288,21 +435,27 @@ export default defineComponent({
     const lastBulkCsvId = ref<string | null>(null);
     const processing = ref(false);
     const checking = ref(false);
+    const validating = ref(false);
+    const loadingDetails = ref(false);
     const csvProcessed = ref(false);
+    const csvValidated = ref(false);
     const csvStatus = ref<BulkMessageCsv | null>(null);
+    const csvDetails = ref<BulkMessageCsvDetails | null>(null);
+    const validationResult = ref<any | null>(null);
 
     const formData = reactive({
       file: null as File | null,
       channel: MessageChannelEnum.SMS,
-      message_gateway_id: "",
+      message_gateway_code: "",
       sender_id: "",
       message_type: "text",
-      template_id: "",
+      template_code: "",
       text: "",
+      lang: "",
     });
 
-    const mapping = reactive<BulkMessageMapping>({
-      phone: "",
+    const mapping = reactive<Record<string, string>>({
+      _l2v_phone: "",
     });
 
     const channelOptions = [
@@ -311,12 +464,17 @@ export default defineComponent({
       { text: "Email", value: MessageChannelEnum.EMAIL },
     ];
 
+    const languageOptions = [
+      { text: "English", value: "en" },
+      { text: "Spanish", value: "es" },
+      { text: "French", value: "fr" },
+      { text: "Arabic", value: "ar" },
+    ];
+
     const selectedTemplate = computed(() => {
-      if (!formData.template_id) return null;
+      if (!formData.template_code) return null;
       return (
-        templates.value.find(
-          (t) => t.id.toString() === formData.template_id.toString()
-        ) || null
+        templates.value.find((t) => t.code === formData.template_code) || null
       );
     });
 
@@ -342,8 +500,64 @@ export default defineComponent({
       return (csv.processed_rows / csv.total_rows) * 100;
     };
 
-    const processBulkCsv = async () => {
+    const getCsvDetails = async () => {
       if (!lastBulkCsvId.value) return;
+
+      loadingDetails.value = true;
+      csvDetails.value = null;
+
+      try {
+        const result = await getBulkMessageCsvDetails(lastBulkCsvId.value);
+        csvDetails.value = result;
+      } catch (error) {
+        status.value = {
+          success: false,
+          message:
+            error instanceof Error ? error.message : "Failed to get CSV details",
+        };
+      } finally {
+        loadingDetails.value = false;
+      }
+    };
+
+    const validateBulkCsv = async () => {
+      if (!lastBulkCsvId.value) return;
+
+      validating.value = true;
+      validationResult.value = null;
+
+      try {
+        const result = await validateBulkMessageCsv(lastBulkCsvId.value);
+        validationResult.value = {
+          valid: true,
+          message: "CSV validation successful",
+        };
+        csvValidated.value = true;
+
+        status.value = {
+          success: true,
+          message: "CSV validated successfully! You can now process the CSV.",
+        };
+      } catch (error) {
+        validationResult.value = {
+          valid: false,
+          errors: [
+            error instanceof Error ? error.message : "Failed to validate CSV",
+          ],
+        };
+
+        status.value = {
+          success: false,
+          message:
+            error instanceof Error ? error.message : "Failed to validate CSV",
+        };
+      } finally {
+        validating.value = false;
+      }
+    };
+
+    const processBulkCsv = async () => {
+      if (!lastBulkCsvId.value || !csvValidated.value) return;
 
       processing.value = true;
 
@@ -460,10 +674,7 @@ export default defineComponent({
     const handleFileChange = (files: File | File[]) => {
       csvHeaders.value = [];
 
-      if (!files) {
-        formData.file = null;
-        return;
-      }
+      if (!files) return;
 
       const fileToProcess = Array.isArray(files)
         ? files.length > 0
@@ -471,12 +682,7 @@ export default defineComponent({
           : null
         : files;
 
-      if (!fileToProcess) {
-        formData.file = null;
-        return;
-      }
-
-      formData.file = fileToProcess;
+      if (!fileToProcess) return;
 
       const reader = new FileReader();
 
@@ -490,7 +696,7 @@ export default defineComponent({
         csvHeaders.value = headers;
 
         if (headers.includes("phone")) {
-          mapping.phone = "phone";
+          mapping._l2v_phone = "phone";
         }
       };
 
@@ -499,7 +705,7 @@ export default defineComponent({
 
     const handleTemplateChange = () => {
       Object.keys(mapping).forEach((key) => {
-        if (key !== "phone") {
+        if (key !== "_l2v_phone") {
           delete mapping[key];
         }
       });
@@ -508,12 +714,6 @@ export default defineComponent({
         selectedTemplate.value.data.forEach((field) => {
           mapping[field] = "";
         });
-      }
-
-      if (!mapping.phone && csvHeaders.value.includes("phone")) {
-        mapping.phone = "phone";
-      } else if (!mapping.phone) {
-        mapping.phone = "";
       }
     };
 
@@ -526,8 +726,11 @@ export default defineComponent({
       isLoading.value = true;
       status.value = null;
       csvStatus.value = null;
+      csvDetails.value = null;
       lastBulkCsvId.value = null;
       csvProcessed.value = false;
+      csvValidated.value = false;
+      validationResult.value = null;
 
       try {
         const payload = new FormData();
@@ -537,23 +740,20 @@ export default defineComponent({
         }
 
         payload.append("channel", formData.channel);
-        payload.append("message_gateway_id", formData.message_gateway_id);
+        payload.append("message_gateway_code", formData.message_gateway_code);
         payload.append("sender_id", formData.sender_id);
 
         if (formData.message_type === "template") {
-          payload.append("template_id", formData.template_id);
+          payload.append("template_code", formData.template_code);
+          payload.append("mapping", JSON.stringify(mapping));
+
+          if (formData.lang) {
+            payload.append("lang", formData.lang);
+          }
         } else {
           payload.append("text", formData.text);
+          payload.append("mapping", JSON.stringify({ _l2v_phone: mapping._l2v_phone }));
         }
-
-        const mappingObj: BulkMessageMapping = {};
-        Object.keys(mapping).forEach((key) => {
-          if (mapping[key]) {
-            mappingObj[key] = mapping[key];
-          }
-        });
-
-        payload.append("mapping", JSON.stringify(mappingObj));
 
         const response = await sendBulkMessages(payload);
 
@@ -562,27 +762,28 @@ export default defineComponent({
 
         status.value = {
           success: true,
-          message: `Bulk messages queued successfully! Click "Process CSV" to start processing.`,
+          message: `Bulk messages queued successfully! Click "View Details" to see CSV information or "Validate CSV" to validate before processing.`,
         };
 
         const channel = formData.channel;
-        const messageGatewayId = formData.message_gateway_id;
+        const messageGatewayCode = formData.message_gateway_code;
         const senderId = formData.sender_id;
 
         formData.file = null;
         formData.message_type = "text";
-        formData.template_id = "";
+        formData.template_code = "";
         formData.text = "";
+        formData.lang = "";
 
         formData.channel = channel;
-        formData.message_gateway_id = messageGatewayId;
+        formData.message_gateway_code = messageGatewayCode;
         formData.sender_id = senderId;
 
-        const phoneMapping = mapping.phone;
+        const phoneMapping = mapping._l2v_phone;
         Object.keys(mapping).forEach((key) => {
           delete mapping[key];
         });
-        mapping.phone = phoneMapping;
+        mapping._l2v_phone = phoneMapping;
 
         csvHeaders.value = [];
       } catch (error) {
@@ -611,6 +812,7 @@ export default defineComponent({
       loadingSenders,
       csvHeaders,
       channelOptions,
+      languageOptions,
       rules,
       selectedTemplate,
       mapping,
@@ -621,10 +823,17 @@ export default defineComponent({
       lastBulkCsvId,
       processing,
       checking,
+      validating,
+      loadingDetails,
       csvProcessed,
+      csvValidated,
       csvStatus,
+      csvDetails,
+      validationResult,
       processBulkCsv,
+      validateBulkCsv,
       checkCsvStatus,
+      getCsvDetails,
       formatDate,
       getStatusColor,
       calculateProgress,
