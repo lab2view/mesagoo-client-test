@@ -8,6 +8,7 @@
           label="Sender Code"
           placeholder="Enter sender code"
           :rules="[rules.required]"
+          :disabled="formDisabled"
         ></v-text-field>
 
         <v-text-field
@@ -15,6 +16,7 @@
           label="Phone Number"
           placeholder="Enter phone number (11-13 digits)"
           :rules="[rules.required, rules.phone]"
+          :disabled="formDisabled"
         ></v-text-field>
 
         <v-select
@@ -25,10 +27,15 @@
           item-value="code"
           :rules="[rules.required]"
           :loading="loadingGateways"
-          :disabled="loadingGateways"
+          :disabled="loadingGateways || formDisabled"
         ></v-select>
 
-        <v-radio-group v-model="formData.message_type" label="Message Type" row>
+        <v-radio-group 
+          v-model="formData.message_type" 
+          label="Message Type" 
+          row
+          :disabled="formDisabled"
+        >
           <v-radio label="Text Message" value="text"></v-radio>
           <v-radio label="Template" value="template"></v-radio>
         </v-radio-group>
@@ -42,7 +49,7 @@
             item-value="code"
             :rules="[rules.required]"
             :loading="loadingTemplates"
-            :disabled="loadingTemplates"
+            :disabled="loadingTemplates || formDisabled"
             @update:model-value="handleTemplateChange"
           ></v-select>
           
@@ -58,6 +65,7 @@
                   :label="field"
                   :placeholder="`Enter ${field}`"
                   :rules="[rules.required]"
+                  :disabled="formDisabled"
                 ></v-text-field>
               </v-col>
             </v-row>
@@ -71,6 +79,7 @@
           placeholder="Enter your message text"
           :rules="[rules.required]"
           rows="3"
+          :disabled="formDisabled"
         ></v-textarea>
 
         <v-select
@@ -79,6 +88,7 @@
           :items="channelOptions"
           item-title="text"
           item-value="value"
+          :disabled="formDisabled"
         ></v-select>
 
         <v-select
@@ -88,6 +98,7 @@
           item-title="text"
           item-value="value"
           clearable
+          :disabled="formDisabled"
         ></v-select>
 
         <v-alert
@@ -96,7 +107,7 @@
           class="mt-4"
         >
           {{ status.message }}
-          <div v-if="status.success && lastMessageId" class="mt-2">
+          <div v-if="status.success && lastMessageId" class="mt-2 d-flex gap-2">
             <v-btn 
               color="info" 
               size="small" 
@@ -105,6 +116,13 @@
               :disabled="verifying"
             >
               Verify Message Status
+            </v-btn>
+            <v-btn 
+              color="secondary" 
+              size="small" 
+              @click="clearForm"
+            >
+              Clear Form
             </v-btn>
           </div>
         </v-alert>
@@ -141,15 +159,25 @@
           </v-card-text>
         </v-card>
 
-        <v-btn
-          type="submit"
-          color="primary"
-          block
-          class="mt-4"
-          :loading="isLoading"
-        >
-          {{ isLoading ? 'Sending...' : 'Send Message' }}
-        </v-btn>
+        <div class="d-flex gap-2 mt-4">
+          <v-btn
+            type="submit"
+            color="primary"
+            block
+            :loading="isLoading"
+            :disabled="isLoading || formDisabled"
+          >
+            {{ isLoading ? 'Sending...' : 'Send Message' }}
+          </v-btn>
+          
+          <v-btn
+            v-if="formDisabled"
+            color="secondary"
+            @click="clearForm"
+          >
+            Clear
+          </v-btn>
+        </div>
       </v-form>
     </v-card-text>
   </v-card>
@@ -188,6 +216,7 @@ export default defineComponent({
     const lastMessageId = ref<string | null>(null)
     const verifying = ref(false)
     const verificationResult = ref<MessageVerification | null>(null)
+    const formDisabled = ref(false)
     
     const formData = reactive({
       sender_code: '',
@@ -239,6 +268,25 @@ export default defineComponent({
       };
       
       return statusMap[status.toLowerCase()] || 'grey';
+    }
+    
+    const clearForm = () => {
+      formData.sender_code = '';
+      formData.phone = '';
+      formData.message_type = 'text';
+      formData.template_code = '';
+      formData.text = '';
+      formData.lang = '';
+      
+      Object.keys(templateData).forEach(key => {
+        delete templateData[key];
+      });
+      
+      status.value = null;
+      verificationResult.value = null;
+      lastMessageId.value = null;
+      
+      formDisabled.value = false;
     }
     
     const verifyMessageStatus = async () => {
@@ -337,21 +385,7 @@ export default defineComponent({
           message: `Message sent successfully! ID: ${lastMessageId.value || 'N/A'}`
         }
         
-        const channel = formData.channel
-        const messageGatewayId = formData.message_gateway_code
-        
-        formData.sender_code = ''
-        formData.phone = ''
-        formData.message_type = 'text'
-        formData.template_code = ''
-        formData.text = ''
-        
-        formData.channel = channel
-        formData.message_gateway_code = messageGatewayId
-        
-        Object.keys(templateData).forEach(key => {
-          delete templateData[key]
-        })
+        formDisabled.value = true;
         
       } catch (error) {
         status.value = {
@@ -385,7 +419,9 @@ export default defineComponent({
       verifyMessageStatus,
       verificationResult,
       formatDate,
-      getStatusColor
+      getStatusColor,
+      formDisabled,
+      clearForm
     }
   }
 })

@@ -10,6 +10,7 @@
           prepend-icon="mdi-file-upload"
           :rules="[rules.required, rules.csvFile]"
           @update:model-value="handleFileChange"
+          :disabled="formDisabled"
         ></v-file-input>
 
         <v-chip-group v-if="csvHeaders.length > 0" class="mb-4">
@@ -30,6 +31,7 @@
           item-title="text"
           item-value="value"
           :rules="[rules.required]"
+          :disabled="formDisabled"
         ></v-select>
 
         <v-select
@@ -40,7 +42,7 @@
           item-value="code"
           :rules="[rules.required]"
           :loading="loadingGateways"
-          :disabled="loadingGateways"
+          :disabled="loadingGateways || formDisabled"
         ></v-select>
 
         <v-select
@@ -51,10 +53,15 @@
           item-value="id"
           :rules="[rules.required]"
           :loading="loadingSenders"
-          :disabled="loadingSenders"
+          :disabled="loadingSenders || formDisabled"
         ></v-select>
 
-        <v-radio-group v-model="formData.message_type" label="Message Type" row>
+        <v-radio-group 
+          v-model="formData.message_type" 
+          label="Message Type" 
+          row
+          :disabled="formDisabled"
+        >
           <v-radio label="Text Message" value="text"></v-radio>
           <v-radio label="Template" value="template"></v-radio>
         </v-radio-group>
@@ -68,7 +75,7 @@
           item-value="code"
           :rules="[rules.required]"
           :loading="loadingTemplates"
-          :disabled="loadingTemplates"
+          :disabled="loadingTemplates || formDisabled"
           @update:model-value="handleTemplateChange"
         ></v-select>
 
@@ -79,6 +86,7 @@
           placeholder="Enter your message text"
           :rules="[rules.required]"
           rows="3"
+          :disabled="formDisabled"
         ></v-textarea>
 
         <v-select
@@ -89,6 +97,7 @@
           item-title="text"
           item-value="value"
           clearable
+          :disabled="formDisabled"
         ></v-select>
 
         <v-card
@@ -109,6 +118,7 @@
                 :items="csvHeaders"
                 :rules="[rules.required]"
                 placeholder="Select the CSV column for phone numbers"
+                :disabled="formDisabled"
               ></v-text-field>
             </v-col>
 
@@ -124,6 +134,7 @@
                 :items="csvHeaders"
                 :rules="[rules.required]"
                 :placeholder="`Select the CSV column for ${field}`"
+                :disabled="formDisabled"
               ></v-text-field>
             </v-col>
           </v-row>
@@ -162,18 +173,26 @@
               @click="processBulkCsv"
               :loading="processing"
               :disabled="processing || !csvValidated || csvProcessed"
+              class="mr-2"
             >
               Process CSV
             </v-btn>
             <v-btn
               color="secondary"
               size="small"
-              class="ml-2"
               @click="checkCsvStatus"
               :loading="checking"
               :disabled="checking || !csvProcessed"
+              class="mr-2"
             >
               Check Status
+            </v-btn>
+            <v-btn
+              color="error"
+              size="small"
+              @click="clearForm"
+            >
+              Clear Form
             </v-btn>
           </div>
         </v-alert>
@@ -369,17 +388,113 @@
           </v-card-text>
         </v-card>
 
-        <v-btn
-          type="submit"
-          color="primary"
-          block
-          class="mt-4"
-          :loading="isLoading"
-        >
-          {{ isLoading ? "Processing..." : "Send Bulk Messages" }}
-        </v-btn>
+        <div class="d-flex gap-2 mt-4">
+          <v-btn
+            type="submit"
+            color="primary"
+            block
+            :loading="isLoading"
+            :disabled="isLoading || formDisabled"
+          >
+            {{ isLoading ? "Processing..." : "Send Bulk Messages" }}
+          </v-btn>
+          
+          <v-btn
+            v-if="formDisabled"
+            color="secondary"
+            @click="clearForm"
+          >
+            Clear
+          </v-btn>
+        </div>
       </v-form>
     </v-card-text>
+  </v-card>
+
+  <!-- Previous Bulk Messages Table -->
+  <v-card class="mt-6">
+    <v-card-title class="d-flex align-center">
+      <span>Previous Bulk Messages</span>
+      <v-spacer></v-spacer>
+      <v-btn
+        color="primary"
+        size="small"
+        @click="loadBulkMessageCsvs"
+        :loading="loadingBulkCsvs"
+      >
+        <v-icon left>mdi-refresh</v-icon>
+        Refresh
+      </v-btn>
+    </v-card-title>
+    
+    <v-data-table
+      :headers="bulkCsvHeaders"
+      :items="bulkCsvs"
+      :loading="loadingBulkCsvs"
+      :items-per-page="10"
+      class="elevation-1"
+    >
+      <template v-slot:item.status="{ item }">
+        <v-chip
+          :color="getStatusColor(item.status)"
+          size="small"
+        >
+          {{ item.status }}
+        </v-chip>
+      </template>
+      
+      <template v-slot:item.channel="{ item }">
+        <v-chip
+          size="small"
+          :color="getChannelColor(item.channel)"
+        >
+          {{ item.channel }}
+        </v-chip>
+      </template>
+      
+      <template v-slot:item.created_at="{ item }">
+        {{ formatDate(item.created_at) }}
+      </template>
+      
+      <template v-slot:item.actions="{ item }">
+        <v-btn
+          icon
+          size="small"
+          color="primary"
+          @click="viewBulkCsvDetails(item.id)"
+          :loading="loadingDetails && selectedBulkCsvId === item.id"
+        >
+          <v-icon>mdi-eye</v-icon>
+        </v-btn>
+        
+        <v-btn
+          icon
+          size="small"
+          color="warning"
+          @click="validateBulkCsvById(item.id)"
+          :disabled="item.status !== BulkMessageCsvStatusEnum.INITIATED"
+        >
+          <v-icon>mdi-check-circle</v-icon>
+        </v-btn>
+        
+        <v-btn
+          icon
+          size="small"
+          color="info"
+          @click="processBulkCsvById(item.id)"
+          :disabled="item.status !== BulkMessageCsvStatusEnum.INITIATED"
+        >
+          <v-icon>mdi-play</v-icon>
+        </v-btn>
+      </template>
+      
+      <template v-slot:no-data>
+        <div class="text-center pa-4">
+          <p class="text-subtitle-1">No bulk messages found</p>
+          <v-btn color="primary" @click="loadBulkMessageCsvs">Refresh</v-btn>
+        </div>
+      </template>
+    </v-data-table>
   </v-card>
 </template>
 
@@ -403,6 +518,7 @@ import {
   getBulkMessageCsvStatus,
   validateBulkMessageCsv,
   getBulkMessageCsvDetails,
+  fetchBulkMessageCsvs,
 } from "../api";
 
 export default defineComponent({
@@ -442,6 +558,21 @@ export default defineComponent({
     const csvStatus = ref<BulkMessageCsv | null>(null);
     const csvDetails = ref<BulkMessageCsvDetails | null>(null);
     const validationResult = ref<any | null>(null);
+    const formDisabled = ref(false);
+    
+    // For the bulk messages table
+    const bulkCsvs = ref<BulkMessageCsvDetails[]>([]);
+    const loadingBulkCsvs = ref(false);
+    const selectedBulkCsvId = ref<number | null>(null);
+    
+    const bulkCsvHeaders = [
+      { title: 'ID', key: 'id', sortable: true },
+      { title: 'Status', key: 'status', sortable: true },
+      { title: 'Channel', key: 'channel', sortable: true },
+      { title: 'Type', key: 'type', sortable: true },
+      { title: 'Created At', key: 'created_at', sortable: true },
+      { title: 'Actions', key: 'actions', sortable: false },
+    ];
 
     const formData = reactive({
       file: null as File | null,
@@ -494,10 +625,51 @@ export default defineComponent({
 
       return statusMap[status.toLowerCase()] || "grey";
     };
+    
+    const getChannelColor = (channel: string) => {
+      const channelMap: Record<string, string> = {
+        [MessageChannelEnum.SMS]: "primary",
+        [MessageChannelEnum.WHATSAPP]: "success",
+        [MessageChannelEnum.EMAIL]: "info",
+      };
+      
+      return channelMap[channel.toLowerCase()] || "grey";
+    };
 
     const calculateProgress = (csv: BulkMessageCsv) => {
       if (!csv || csv.total_rows === 0) return 0;
       return (csv.processed_rows / csv.total_rows) * 100;
+    };
+    
+    const clearForm = () => {
+      // Reset form fields
+      formData.file = null;
+      formData.message_type = 'text';
+      formData.template_code = '';
+      formData.text = '';
+      formData.lang = '';
+      
+      // Clear mapping except phone
+      const phoneMapping = mapping._l2v_phone;
+      Object.keys(mapping).forEach(key => {
+        delete mapping[key];
+      });
+      mapping._l2v_phone = phoneMapping;
+      
+      // Clear CSV headers
+      csvHeaders.value = [];
+      
+      // Reset status and verification
+      status.value = null;
+      csvStatus.value = null;
+      csvDetails.value = null;
+      lastBulkCsvId.value = null;
+      csvProcessed.value = false;
+      csvValidated.value = false;
+      validationResult.value = null;
+      
+      // Enable form
+      formDisabled.value = false;
     };
 
     const getCsvDetails = async () => {
@@ -518,6 +690,30 @@ export default defineComponent({
       } finally {
         loadingDetails.value = false;
       }
+    };
+    
+    const viewBulkCsvDetails = async (id: number) => {
+      selectedBulkCsvId.value = id;
+      lastBulkCsvId.value = id.toString();
+      await getCsvDetails();
+    };
+    
+    const validateBulkCsvById = async (id: number) => {
+      selectedBulkCsvId.value = id;
+      lastBulkCsvId.value = id.toString();
+      await validateBulkCsv();
+      await loadBulkMessageCsvs();
+    };
+    
+    const processBulkCsvById = async (id: number) => {
+      selectedBulkCsvId.value = id;
+      lastBulkCsvId.value = id.toString();
+      
+      // Assume it's already validated if we're processing directly from the table
+      csvValidated.value = true;
+      
+      await processBulkCsv();
+      await loadBulkMessageCsvs();
     };
 
     const validateBulkCsv = async () => {
@@ -606,6 +802,18 @@ export default defineComponent({
         checking.value = false;
       }
     };
+    
+    const loadBulkMessageCsvs = async () => {
+      loadingBulkCsvs.value = true;
+      
+      try {
+        bulkCsvs.value = await fetchBulkMessageCsvs();
+      } catch (error) {
+        console.error('Failed to load bulk message CSVs:', error);
+      } finally {
+        loadingBulkCsvs.value = false;
+      }
+    };
 
     const rules = {
       required: (v: any) => {
@@ -669,6 +877,9 @@ export default defineComponent({
       } finally {
         loadingSenders.value = false;
       }
+      
+      // Load bulk message CSVs
+      await loadBulkMessageCsvs();
     });
 
     const handleFileChange = (files: File | File[]) => {
@@ -764,28 +975,12 @@ export default defineComponent({
           success: true,
           message: `Bulk messages queued successfully! Click "View Details" to see CSV information or "Validate CSV" to validate before processing.`,
         };
-
-        const channel = formData.channel;
-        const messageGatewayCode = formData.message_gateway_code;
-        const senderId = formData.sender_id;
-
-        formData.file = null;
-        formData.message_type = "text";
-        formData.template_code = "";
-        formData.text = "";
-        formData.lang = "";
-
-        formData.channel = channel;
-        formData.message_gateway_code = messageGatewayCode;
-        formData.sender_id = senderId;
-
-        const phoneMapping = mapping._l2v_phone;
-        Object.keys(mapping).forEach((key) => {
-          delete mapping[key];
-        });
-        mapping._l2v_phone = phoneMapping;
-
-        csvHeaders.value = [];
+        
+        // Disable form after successful submission
+        formDisabled.value = true;
+        
+        // Refresh the bulk messages list
+        await loadBulkMessageCsvs();
       } catch (error) {
         status.value = {
           success: false,
@@ -836,7 +1031,20 @@ export default defineComponent({
       getCsvDetails,
       formatDate,
       getStatusColor,
+      getChannelColor,
       calculateProgress,
+      formDisabled,
+      clearForm,
+      // Bulk messages table
+      bulkCsvs,
+      bulkCsvHeaders,
+      loadingBulkCsvs,
+      loadBulkMessageCsvs,
+      viewBulkCsvDetails,
+      validateBulkCsvById,
+      processBulkCsvById,
+      selectedBulkCsvId,
+      BulkMessageCsvStatusEnum,
     };
   },
 });

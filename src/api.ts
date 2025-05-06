@@ -296,6 +296,41 @@ export async function sendBulkMessages(formData: FormData): Promise<any> {
   return result.data || result;
 }
 
+export async function fetchBulkMessageCsvs(
+  params: Record<string, any> = {}
+): Promise<BulkMessageCsvDetails[]> {
+  const { baseUrl, bearerToken } = getApiSettings();
+
+  const queryParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      queryParams.append(key, value.toString());
+    }
+  });
+
+  const queryString = queryParams.toString()
+    ? `?${queryParams.toString()}`
+    : "";
+
+  const response = await fetch(`${baseUrl}/bulk-message-csvs${queryString}`, {
+    headers: {
+      Authorization: `Bearer ${bearerToken}`,
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(
+      errorData.message ||
+        `Failed to fetch bulk message CSVs: ${response.status}`
+    );
+  }
+
+  const result = await response.json();
+  return result.data || [];
+}
+
 export async function processBulkMessageCsv(
   bulkMessageCsvId: string | number
 ): Promise<any> {
