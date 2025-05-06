@@ -1,7 +1,7 @@
 <template>
     <v-card class="mx-auto my-12" max-width="500">
       <v-card-title class="text-h5">
-        Login to SMS Gateway API Tester
+        Mesagoo Api Playground
       </v-card-title>
       <v-card-text>
         <p class="mb-4">Please enter your email and password to access the API.</p>
