@@ -15,14 +15,31 @@
         <v-icon left>mdi-file-document-outline</v-icon>
         Templates
       </v-btn>
-      <v-btn icon @click="showApiSettings = true">
-        <v-icon>mdi-cog</v-icon>
-      </v-btn>
+      <v-menu>
+        <template v-slot:activator="{ props }">
+          <v-btn icon v-bind="props">
+            <v-icon>mdi-account-circle</v-icon>
+          </v-btn>
+        </template>
+        <v-list>
+          <v-list-item v-if="currentUser">
+            <v-list-item-title>{{ currentUser.name }}</v-list-item-title>
+            <v-list-item-subtitle>{{ currentUser.email }}</v-list-item-subtitle>
+          </v-list-item>
+          <v-divider></v-divider>
+          <v-list-item @click="showApiSettings = true">
+            <v-list-item-title>API Settings</v-list-item-title>
+          </v-list-item>
+          <v-list-item @click="handleLogout">
+            <v-list-item-title>Logout</v-list-item-title>
+          </v-list-item>
+        </v-list>
+      </v-menu>
     </v-app-bar>
 
     <v-main>
       <v-container>
-        <router-view @authenticated="setAuthenticated" :environment="environment"></router-view>
+        <router-view @authenticated="setAuthenticated"></router-view>
       </v-container>
     </v-main>
 
@@ -32,20 +49,16 @@
         <v-card-text>
           <v-form @submit.prevent="saveApiSettings">
             <v-text-field
-              v-model="apiSettings.baseUrl"
+              v-model="apiBaseUrl"
               label="API Base URL"
-              hint="e.g., https://api.example.com"
+              hint="Default: https://mesagoo-api.onrender.com/api/v1"
               persistent-hint
-            ></v-text-field>
-            
-            <v-text-field
-              v-model="apiSettings.bearerToken"
-              label="Bearer Token"
-              class="mt-4"
+              :placeholder="DEFAULT_BASE_URL"
             ></v-text-field>
           </v-form>
         </v-card-text>
         <v-card-actions>
+          <v-btn color="error" variant="text" @click="resetApiBaseUrl">Reset to Default</v-btn>
           <v-spacer></v-spacer>
           <v-btn color="grey" variant="text" @click="showApiSettings = false">Cancel</v-btn>
           <v-btn color="primary" @click="saveApiSettings">Save</v-btn>
@@ -56,60 +69,69 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, reactive, onMounted } from 'vue'
+import { defineComponent, ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { isAuthenticated, getCurrentUser, logout, setApiBaseUrl, getApiSettings, DEFAULT_BASE_URL } from './api'
+import type { User } from './types'
 
 export default defineComponent({
   name: 'App',
   setup() {
     const router = useRouter()
-    const isAuthenticated = ref(false)
+    const isAuthenticatedState = ref(isAuthenticated())
     const showApiSettings = ref(false)
+    const apiBaseUrl = ref(getApiSettings().baseUrl)
     
-    const apiSettings = reactive({
-      baseUrl: localStorage.getItem('sms_gateway_base_url') || '',
-      bearerToken: localStorage.getItem('sms_gateway_bearer_token') || ''
+    const currentUser = computed<User | null>(() => {
+      return getCurrentUser()
     })
-
-    const defaultEnvironment = {
-      name: 'Default',
-      baseUrl: '',
-      endpoints: {
-        single: '/messages/single',
-        bulk: '/messages/bulk'
-      }
-    }
+    
+    watch(() => router.currentRoute.value, () => {
+      isAuthenticatedState.value = isAuthenticated()
+    }, { immediate: true })
     
     onMounted(() => {
-      if (apiSettings.baseUrl && apiSettings.bearerToken) {
-        isAuthenticated.value = true
-      } else {
-        router.push('/')
-      }
+      checkAuthentication()
     })
     
-    const setAuthenticated = () => {
-      isAuthenticated.value = true
+    const checkAuthentication = () => {
+      isAuthenticatedState.value = isAuthenticated()
+      
+      if (!isAuthenticatedState.value && router.currentRoute.value.path !== '/') {
+        router.push('/')
+      }
     }
     
+    const setAuthenticated = () => {
+      isAuthenticatedState.value = true
+    }
+    
+    const handleLogout = () => {
+      logout()
+      isAuthenticatedState.value = false
+      router.push('/')
+    }
+
     const saveApiSettings = () => {
-      localStorage.setItem('sms_gateway_base_url', apiSettings.baseUrl)
-      localStorage.setItem('sms_gateway_bearer_token', apiSettings.bearerToken)
-      isAuthenticated.value = true
+      setApiBaseUrl(apiBaseUrl.value)
       showApiSettings.value = false
-      
-      if (router.currentRoute.value.path === '/') {
-        router.push('/single')
-      }
+    }
+
+    const resetApiBaseUrl = () => {
+      apiBaseUrl.value = DEFAULT_BASE_URL
+      setApiBaseUrl(DEFAULT_BASE_URL)
     }
     
     return {
-      isAuthenticated,
-      showApiSettings,
-      apiSettings,
+      isAuthenticated: isAuthenticatedState,
+      currentUser,
       setAuthenticated,
+      handleLogout,
+      showApiSettings,
+      apiBaseUrl,
       saveApiSettings,
-      environment: defaultEnvironment,
+      resetApiBaseUrl,
+      DEFAULT_BASE_URL
     }
   }
 })

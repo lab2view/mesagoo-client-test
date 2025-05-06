@@ -12,6 +12,20 @@ export interface ApiSettings {
   bearerToken: string;
 }
 
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: User;
+}
+
 export enum MessageChannelEnum {
   SMS = "sms",
   WHATSAPP = "whatsapp",
@@ -52,10 +66,11 @@ export interface Sender {
 export interface SingleMessagePayload {
   sender_code: string;
   phone: string;
-  message_gateway_id: string;
+  message_gateway_code: string;
   channel?: string;
+  lang?: string;
   template?: {
-    id: string;
+    code: string;
     data: Record<string, any>;
   };
   text?: string;
@@ -88,4 +103,26 @@ export interface BulkMessageCsv {
 
 export interface BulkMessageMapping {
   [key: string]: string | null;
+}
+
+export interface BulkMessageCsvDetails {
+  id: number;
+  text: string;
+  channel: string;
+  message_gateway_id: number;
+  status: string;
+  sender_id: number;
+  template_id: number | null;
+  type: string;
+  user_id: number;
+  mapping: Record<string, string>;
+  summary: any;
+  initial_url: string;
+  formated_url: string;
+  created_at: string;
+  updated_at: string;
+  message_gateway?: MessageGateway;
+  sender?: Sender;
+  template?: Template;
+  user?: User;
 }

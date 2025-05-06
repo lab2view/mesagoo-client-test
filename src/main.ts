@@ -6,64 +6,69 @@ import * as directives from "vuetify/directives";
 import { createRouter, createWebHashHistory } from "vue-router";
 import "vuetify/styles";
 import "@mdi/font/css/materialdesignicons.css";
+import { isAuthenticated } from "./api";
 
-import ApiSetup from "./views/ApiSetup.vue";
+// Import routes
+import Login from "./views/Login.vue";
 import SingleMessage from "./views/SingleMessage.vue";
 import BulkMessage from "./views/BulkMessage.vue";
 import TemplateList from "./views/TemplateList.vue";
 import TemplateCreate from "./views/TemplateCreate.vue";
 import TemplateEdit from "./views/TemplateEdit.vue";
 
-const defaultEnvironment = {
-  name: "Default",
-  baseUrl: "",
-  endpoints: {
-    single: "/messages/single",
-    bulk: "/messages/bulk",
-  },
-};
-
+// Create router
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [
     {
       path: "/",
-      component: ApiSetup,
-      props: { environment: defaultEnvironment },
+      component: Login,
+      meta: { requiresAuth: false },
     },
     {
       path: "/single",
       component: SingleMessage,
-      props: { environment: defaultEnvironment },
+      meta: { requiresAuth: true },
     },
     {
       path: "/bulk",
       component: BulkMessage,
-      props: { environment: defaultEnvironment },
+      meta: { requiresAuth: true },
     },
     {
       path: "/templates",
       component: TemplateList,
-      props: { environment: defaultEnvironment },
+      meta: { requiresAuth: true },
     },
     {
       path: "/templates/create",
       component: TemplateCreate,
-      props: { environment: defaultEnvironment },
+      meta: { requiresAuth: true },
     },
     {
       path: "/templates/:id",
       component: TemplateEdit,
       props: (route) => ({
-        environment: defaultEnvironment,
         id: route.params.id,
       }),
+      meta: { requiresAuth: true },
     },
     {
       path: "/:pathMatch(.*)*",
       redirect: "/",
     },
   ],
+});
+
+router.beforeEach((to, from, next) => {
+  const requiresAuth = to.matched.some((record) => record.meta.requiresAuth);
+  const authenticated = isAuthenticated();
+
+  if (requiresAuth && !authenticated) {
+    next("/");
+  } else {
+    next();
+  }
 });
 
 const vuetify = createVuetify({

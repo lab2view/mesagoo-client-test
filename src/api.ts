@@ -4,13 +4,69 @@ import type {
   Template,
   SingleMessagePayload,
   BulkMessageCsv,
+  AuthResponse,
+  User,
 } from "./types";
+
+export const DEFAULT_BASE_URL = "https://mesagoo-api.onrender.com/api/v1";
 
 export function getApiSettings(): ApiSettings {
   return {
-    baseUrl: localStorage.getItem("sms_gateway_base_url") || "",
+    baseUrl: localStorage.getItem("sms_gateway_base_url") || DEFAULT_BASE_URL,
     bearerToken: localStorage.getItem("sms_gateway_bearer_token") || "",
   };
+}
+
+export function setApiBaseUrl(baseUrl: string): void {
+  localStorage.setItem("sms_gateway_base_url", baseUrl);
+}
+
+export async function login(
+  email: string,
+  password: string
+): Promise<AuthResponse> {
+  const { baseUrl } = getApiSettings();
+
+  const response = await fetch(`${baseUrl}/auth/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.message || `Login failed: ${response.status}`);
+  }
+
+  const result = await response.json();
+
+  localStorage.setItem("sms_gateway_bearer_token", result.token);
+  localStorage.setItem("sms_gateway_user", JSON.stringify(result.user));
+
+  return result;
+}
+
+export function getCurrentUser(): User | null {
+  const userJson = localStorage.getItem("sms_gateway_user");
+  if (!userJson) return null;
+
+  try {
+    return JSON.parse(userJson);
+  } catch (error) {
+    return null;
+  }
+}
+
+export function logout(): void {
+  localStorage.removeItem("sms_gateway_bearer_token");
+  localStorage.removeItem("sms_gateway_user");
+}
+
+export function isAuthenticated(): boolean {
+  return !!localStorage.getItem("sms_gateway_bearer_token");
 }
 
 export async function fetchMessageGateways(): Promise<MessageGateway[]> {
@@ -20,7 +76,6 @@ export async function fetchMessageGateways(): Promise<MessageGateway[]> {
     headers: {
       Authorization: `Bearer ${bearerToken}`,
       Accept: "application/json",
-      "Content-Type": "application/json",
     },
   });
 
@@ -43,7 +98,6 @@ export async function fetchTemplates(): Promise<Template[]> {
     headers: {
       Authorization: `Bearer ${bearerToken}`,
       Accept: "application/json",
-      "Content-Type": "application/json",
     },
   });
 
@@ -65,7 +119,6 @@ export async function fetchTemplate(id: string): Promise<Template> {
     headers: {
       Authorization: `Bearer ${bearerToken}`,
       Accept: "application/json",
-      "Content-Type": "application/json",
     },
   });
 
@@ -77,7 +130,7 @@ export async function fetchTemplate(id: string): Promise<Template> {
   }
 
   const result = await response.json();
-  return result || {};
+  return result.data || {};
 }
 
 export async function createTemplate(
@@ -88,8 +141,8 @@ export async function createTemplate(
   const response = await fetch(`${baseUrl}/templates`, {
     method: "POST",
     headers: {
-      Accept: "application/json",
       "Content-Type": "application/json",
+      Accept: "application/json",
       Authorization: `Bearer ${bearerToken}`,
     },
     body: JSON.stringify(template),
@@ -115,8 +168,8 @@ export async function updateTemplate(
   const response = await fetch(`${baseUrl}/templates/${id}`, {
     method: "PUT",
     headers: {
-      Accept: "application/json",
       "Content-Type": "application/json",
+      Accept: "application/json",
       Authorization: `Bearer ${bearerToken}`,
     },
     body: JSON.stringify(template),
@@ -139,9 +192,8 @@ export async function deleteTemplate(id: string): Promise<void> {
   const response = await fetch(`${baseUrl}/templates/${id}`, {
     method: "DELETE",
     headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
       Authorization: `Bearer ${bearerToken}`,
+      Accept: "application/json",
     },
   });
 
@@ -158,9 +210,8 @@ export async function fetchSenders(): Promise<any[]> {
 
   const response = await fetch(`${baseUrl}/senders`, {
     headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
       Authorization: `Bearer ${bearerToken}`,
+      Accept: "application/json",
     },
   });
 
@@ -183,8 +234,8 @@ export async function sendSingleMessage(
   const response = await fetch(`${baseUrl}/messages/single`, {
     method: "POST",
     headers: {
-      Accept: "application/json",
       "Content-Type": "application/json",
+      Accept: "application/json",
       Authorization: `Bearer ${bearerToken}`,
     },
     body: JSON.stringify(payload),
@@ -207,6 +258,7 @@ export async function verifyMessage(messageId: string): Promise<any> {
   const response = await fetch(`${baseUrl}/messages/single/${messageId}`, {
     headers: {
       Authorization: `Bearer ${bearerToken}`,
+      Accept: "application/json",
     },
   });
 
@@ -227,8 +279,8 @@ export async function sendBulkMessages(formData: FormData): Promise<any> {
   const response = await fetch(`${baseUrl}/bulk-message-csvs`, {
     method: "POST",
     headers: {
-      Accept: "application/json",
       Authorization: `Bearer ${bearerToken}`,
+      Accept: "application/json",
     },
     body: formData,
   });
@@ -255,6 +307,7 @@ export async function processBulkMessageCsv(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Accept: "application/json",
         Authorization: `Bearer ${bearerToken}`,
       },
     }
@@ -282,6 +335,7 @@ export async function getBulkMessageCsvStatus(
     {
       headers: {
         Authorization: `Bearer ${bearerToken}`,
+        Accept: "application/json",
       },
     }
   );
@@ -291,6 +345,61 @@ export async function getBulkMessageCsvStatus(
     throw new Error(
       errorData.message ||
         `Failed to get bulk message CSV status: ${response.status}`
+    );
+  }
+
+  const result = await response.json();
+  return result.data || result;
+}
+
+export async function getBulkMessageCsvDetails(
+  bulkMessageCsvId: string | number
+): Promise<BulkMessageCsvDetails> {
+  const { baseUrl, bearerToken } = getApiSettings();
+
+  const response = await fetch(
+    `${baseUrl}/bulk-message-csvs/${bulkMessageCsvId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${bearerToken}`,
+        Accept: "application/json",
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(
+      errorData.message ||
+        `Failed to get bulk message CSV details: ${response.status}`
+    );
+  }
+
+  const result = await response.json();
+  return result.data || result;
+}
+
+export async function validateBulkMessageCsv(
+  bulkMessageCsvId: string | number
+): Promise<any> {
+  const { baseUrl, bearerToken } = getApiSettings();
+
+  const response = await fetch(
+    `${baseUrl}/bulk-message-csvs/${bulkMessageCsvId}/validate`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${bearerToken}`,
+        Accept: "application/json",
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(
+      errorData.message ||
+        `Failed to validate bulk message CSV: ${response.status}`
     );
   }
 
