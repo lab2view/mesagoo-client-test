@@ -54,7 +54,7 @@
   export default defineComponent({
     name: 'Login',
     emits: ['authenticated'],
-    setup(props, { emit }) {
+    setup(_props, { emit }) {
       const router = useRouter()
       const form = ref(null)
       const email = ref('')

@@ -6,6 +6,7 @@ import type {
   BulkMessageCsv,
   AuthResponse,
   User,
+  BulkMessageCsvDetails,
 } from "./types";
 
 export const DEFAULT_BASE_URL = "https://mesagoo-api.onrender.com/api/v1";

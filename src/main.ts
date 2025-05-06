@@ -8,7 +8,6 @@ import "vuetify/styles";
 import "@mdi/font/css/materialdesignicons.css";
 import { isAuthenticated } from "./api";
 
-// Import routes
 import Login from "./views/Login.vue";
 import SingleMessage from "./views/SingleMessage.vue";
 import BulkMessage from "./views/BulkMessage.vue";
@@ -16,7 +15,6 @@ import TemplateList from "./views/TemplateList.vue";
 import TemplateCreate from "./views/TemplateCreate.vue";
 import TemplateEdit from "./views/TemplateEdit.vue";
 
-// Create router
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [
@@ -60,7 +58,7 @@ const router = createRouter({
   ],
 });
 
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, _, next) => {
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth);
   const authenticated = isAuthenticated();
 

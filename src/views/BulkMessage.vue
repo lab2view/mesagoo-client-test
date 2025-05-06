@@ -723,7 +723,7 @@ export default defineComponent({
       validationResult.value = null;
 
       try {
-        const result = await validateBulkMessageCsv(lastBulkCsvId.value);
+        await validateBulkMessageCsv(lastBulkCsvId.value);
         validationResult.value = {
           valid: true,
           message: "CSV validation successful",
