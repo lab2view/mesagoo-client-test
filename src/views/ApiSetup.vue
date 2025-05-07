@@ -1,9 +1,9 @@
 <template>
   <v-card class="mx-auto my-12" max-width="500">
-    <v-card-title class="text-h5"> SMS Gateway API Setup </v-card-title>
+    <v-card-title class="text-h5"> Mesagoo Client Test Setup </v-card-title>
     <v-card-text>
       <p class="mb-4">
-        Please enter your API base URL and bearer token to get started.
+        Please enter your API base URL.
       </p>
       <v-form @submit.prevent="saveSettings" ref="form">
         <v-text-field

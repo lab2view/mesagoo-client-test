@@ -197,7 +197,6 @@
           </div>
         </v-alert>
 
-        <!-- CSV Details -->
         <v-card v-if="csvDetails" class="mt-4 pa-4">
           <v-card-title class="text-h6">CSV Details</v-card-title>
           <v-card-text>
@@ -411,7 +410,6 @@
     </v-card-text>
   </v-card>
 
-  <!-- Previous Bulk Messages Table -->
   <v-card class="mt-6">
     <v-card-title class="d-flex align-center">
       <span>Previous Bulk Messages</span>
@@ -560,7 +558,6 @@ export default defineComponent({
     const validationResult = ref<any | null>(null);
     const formDisabled = ref(false);
     
-    // For the bulk messages table
     const bulkCsvs = ref<BulkMessageCsvDetails[]>([]);
     const loadingBulkCsvs = ref(false);
     const selectedBulkCsvId = ref<number | null>(null);
@@ -642,24 +639,20 @@ export default defineComponent({
     };
     
     const clearForm = () => {
-      // Reset form fields
       formData.file = null;
       formData.message_type = 'text';
       formData.template_code = '';
       formData.text = '';
       formData.lang = '';
       
-      // Clear mapping except phone
       const phoneMapping = mapping._l2v_phone;
       Object.keys(mapping).forEach(key => {
         delete mapping[key];
       });
       mapping._l2v_phone = phoneMapping;
       
-      // Clear CSV headers
       csvHeaders.value = [];
       
-      // Reset status and verification
       status.value = null;
       csvStatus.value = null;
       csvDetails.value = null;
@@ -668,7 +661,6 @@ export default defineComponent({
       csvValidated.value = false;
       validationResult.value = null;
       
-      // Enable form
       formDisabled.value = false;
     };
 
@@ -709,7 +701,6 @@ export default defineComponent({
       selectedBulkCsvId.value = id;
       lastBulkCsvId.value = id.toString();
       
-      // Assume it's already validated if we're processing directly from the table
       csvValidated.value = true;
       
       await processBulkCsv();
@@ -878,7 +869,6 @@ export default defineComponent({
         loadingSenders.value = false;
       }
       
-      // Load bulk message CSVs
       await loadBulkMessageCsvs();
     });
 
@@ -976,10 +966,8 @@ export default defineComponent({
           message: `Bulk messages queued successfully! Click "View Details" to see CSV information or "Validate CSV" to validate before processing.`,
         };
         
-        // Disable form after successful submission
         formDisabled.value = true;
         
-        // Refresh the bulk messages list
         await loadBulkMessageCsvs();
       } catch (error) {
         status.value = {
@@ -1035,7 +1023,6 @@ export default defineComponent({
       calculateProgress,
       formDisabled,
       clearForm,
-      // Bulk messages table
       bulkCsvs,
       bulkCsvHeaders,
       loadingBulkCsvs,
