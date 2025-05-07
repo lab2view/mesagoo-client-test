@@ -65,6 +65,21 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <v-dialog v-model="showSessionExpiredDialog" persistent max-width="400px">
+      <v-card>
+        <v-card-title class="text-h5">Session Expired</v-card-title>
+        <v-card-text>
+          Your session has expired. Please log in again to continue.
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn color="primary" @click="redirectToLogin">
+            Log In
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-app>
 </template>
 
@@ -81,6 +96,7 @@ export default defineComponent({
     const isAuthenticatedState = ref(isAuthenticated())
     const showApiSettings = ref(false)
     const apiBaseUrl = ref(getApiSettings().baseUrl)
+    const showSessionExpiredDialog = ref(false)
     
     const currentUser = computed<User | null>(() => {
       return getCurrentUser()
@@ -92,6 +108,10 @@ export default defineComponent({
     
     onMounted(() => {
       checkAuthentication()
+      
+      window.addEventListener('session-expired', () => {
+        showSessionExpiredDialog.value = true
+      })
     })
     
     const checkAuthentication = () => {
@@ -122,6 +142,11 @@ export default defineComponent({
       setApiBaseUrl(DEFAULT_BASE_URL)
     }
     
+    const redirectToLogin = () => {
+      showSessionExpiredDialog.value = false
+      router.push('/')
+    }
+    
     return {
       isAuthenticated: isAuthenticatedState,
       currentUser,
@@ -131,7 +156,9 @@ export default defineComponent({
       apiBaseUrl,
       saveApiSettings,
       resetApiBaseUrl,
-      DEFAULT_BASE_URL
+      DEFAULT_BASE_URL,
+      showSessionExpiredDialog,
+      redirectToLogin
     }
   }
 })

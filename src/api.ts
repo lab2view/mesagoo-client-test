@@ -4,9 +4,9 @@ import type {
   Template,
   SingleMessagePayload,
   BulkMessageCsv,
+  BulkMessageCsvDetails,
   AuthResponse,
   User,
-  BulkMessageCsvDetails,
 } from "./types";
 
 export const DEFAULT_BASE_URL = "https://mesagoo-api.onrender.com/api/v1";
@@ -20,6 +20,24 @@ export function getApiSettings(): ApiSettings {
 
 export function setApiBaseUrl(baseUrl: string): void {
   localStorage.setItem("sms_gateway_base_url", baseUrl);
+}
+
+export async function handleApiResponse(response: Response): Promise<any> {
+  if (response.status === 401) {
+    logout();
+
+    window.dispatchEvent(new Event("session-expired"));
+
+    throw new Error("Your session has expired. Please log in again.");
+  }
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.message || `Request failed: ${response.status}`);
+  }
+
+  const result = await response.json();
+  return result.data || result;
 }
 
 export async function login(
@@ -80,16 +98,7 @@ export async function fetchMessageGateways(): Promise<MessageGateway[]> {
     },
   });
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(
-      errorData.message ||
-        `Failed to fetch message gateways: ${response.status}`
-    );
-  }
-
-  const result = await response.json();
-  return result.data || [];
+  return handleApiResponse(response);
 }
 
 export async function fetchTemplates(): Promise<Template[]> {
@@ -102,15 +111,7 @@ export async function fetchTemplates(): Promise<Template[]> {
     },
   });
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(
-      errorData.message || `Failed to fetch templates: ${response.status}`
-    );
-  }
-
-  const result = await response.json();
-  return result.data || [];
+  return handleApiResponse(response);
 }
 
 export async function fetchTemplate(id: string): Promise<Template> {
@@ -123,15 +124,7 @@ export async function fetchTemplate(id: string): Promise<Template> {
     },
   });
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(
-      errorData.message || `Failed to fetch template: ${response.status}`
-    );
-  }
-
-  const result = await response.json();
-  return result.data || {};
+  return handleApiResponse(response);
 }
 
 export async function createTemplate(
@@ -149,15 +142,7 @@ export async function createTemplate(
     body: JSON.stringify(template),
   });
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(
-      errorData.message || `Failed to create template: ${response.status}`
-    );
-  }
-
-  const result = await response.json();
-  return result.data || {};
+  return handleApiResponse(response);
 }
 
 export async function updateTemplate(
@@ -176,15 +161,7 @@ export async function updateTemplate(
     body: JSON.stringify(template),
   });
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(
-      errorData.message || `Failed to update template: ${response.status}`
-    );
-  }
-
-  const result = await response.json();
-  return result.data || {};
+  return handleApiResponse(response);
 }
 
 export async function deleteTemplate(id: string): Promise<void> {
@@ -198,12 +175,7 @@ export async function deleteTemplate(id: string): Promise<void> {
     },
   });
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(
-      errorData.message || `Failed to delete template: ${response.status}`
-    );
-  }
+  return handleApiResponse(response);
 }
 
 export async function fetchSenders(): Promise<any[]> {
@@ -216,15 +188,7 @@ export async function fetchSenders(): Promise<any[]> {
     },
   });
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(
-      errorData.message || `Failed to fetch senders: ${response.status}`
-    );
-  }
-
-  const result = await response.json();
-  return result.data || [];
+  return handleApiResponse(response);
 }
 
 export async function sendSingleMessage(
@@ -242,15 +206,7 @@ export async function sendSingleMessage(
     body: JSON.stringify(payload),
   });
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(
-      errorData.message || `Failed to send message: ${response.status}`
-    );
-  }
-
-  const result = await response.json();
-  return result.data || result;
+  return handleApiResponse(response);
 }
 
 export async function verifyMessage(messageId: string): Promise<any> {
@@ -263,15 +219,7 @@ export async function verifyMessage(messageId: string): Promise<any> {
     },
   });
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(
-      errorData.message || `Failed to verify message: ${response.status}`
-    );
-  }
-
-  const result = await response.json();
-  return result.data || result;
+  return handleApiResponse(response);
 }
 
 export async function sendBulkMessages(formData: FormData): Promise<any> {
@@ -286,15 +234,7 @@ export async function sendBulkMessages(formData: FormData): Promise<any> {
     body: formData,
   });
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(
-      errorData.message || `Failed to send bulk messages: ${response.status}`
-    );
-  }
-
-  const result = await response.json();
-  return result.data || result;
+  return handleApiResponse(response);
 }
 
 export async function fetchBulkMessageCsvs(
@@ -320,16 +260,7 @@ export async function fetchBulkMessageCsvs(
     },
   });
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(
-      errorData.message ||
-        `Failed to fetch bulk message CSVs: ${response.status}`
-    );
-  }
-
-  const result = await response.json();
-  return result.data || [];
+  return handleApiResponse(response);
 }
 
 export async function processBulkMessageCsv(
@@ -349,16 +280,7 @@ export async function processBulkMessageCsv(
     }
   );
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(
-      errorData.message ||
-        `Failed to process bulk message CSV: ${response.status}`
-    );
-  }
-
-  const result = await response.json();
-  return result.data || result;
+  return handleApiResponse(response);
 }
 
 export async function getBulkMessageCsvStatus(
@@ -376,16 +298,7 @@ export async function getBulkMessageCsvStatus(
     }
   );
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(
-      errorData.message ||
-        `Failed to get bulk message CSV status: ${response.status}`
-    );
-  }
-
-  const result = await response.json();
-  return result.data || result;
+  return handleApiResponse(response);
 }
 
 export async function getBulkMessageCsvDetails(
@@ -403,16 +316,7 @@ export async function getBulkMessageCsvDetails(
     }
   );
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(
-      errorData.message ||
-        `Failed to get bulk message CSV details: ${response.status}`
-    );
-  }
-
-  const result = await response.json();
-  return result.data || result;
+  return handleApiResponse(response);
 }
 
 export async function validateBulkMessageCsv(
@@ -431,14 +335,5 @@ export async function validateBulkMessageCsv(
     }
   );
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(
-      errorData.message ||
-        `Failed to validate bulk message CSV: ${response.status}`
-    );
-  }
-
-  const result = await response.json();
-  return result.data || result;
+  return handleApiResponse(response);
 }
