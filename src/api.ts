@@ -7,6 +7,7 @@ import type {
   BulkMessageCsvDetails,
   AuthResponse,
   User,
+  BulkMessageCsvSummary,
 } from "./types";
 
 export const DEFAULT_BASE_URL = "https://mesagoo-api.onrender.com/api/v1";
@@ -328,6 +329,24 @@ export async function validateBulkMessageCsv(
     `${baseUrl}/bulk-message-csvs/${bulkMessageCsvId}/validate`,
     {
       method: "POST",
+      headers: {
+        Authorization: `Bearer ${bearerToken}`,
+        Accept: "application/json",
+      },
+    }
+  );
+
+  return handleApiResponse(response);
+}
+
+export async function getBulkMessageCsvSummary(
+  bulkMessageCsvId: string | number
+): Promise<BulkMessageCsvSummary[]> {
+  const { baseUrl, bearerToken } = getApiSettings();
+
+  const response = await fetch(
+    `${baseUrl}/bulk-message-csvs/${bulkMessageCsvId}/summary`,
+    {
       headers: {
         Authorization: `Bearer ${bearerToken}`,
         Accept: "application/json",

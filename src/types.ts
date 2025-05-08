@@ -35,6 +35,7 @@ export enum MessageChannelEnum {
 export enum BulkMessageCsvStatusEnum {
   INITIATED = "initiated",
   PROCESSING = "processing",
+  PROCESSED = "processed",
   COMPLETED = "completed",
   FAILED = "failed",
 }
@@ -126,3 +127,5 @@ export interface BulkMessageCsvDetails {
   template?: Template;
   user?: User;
 }
+
+export type BulkMessageCsvSummary = Country;

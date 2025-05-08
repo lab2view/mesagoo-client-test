@@ -387,6 +387,12 @@
           </v-card-text>
         </v-card>
 
+        <BulkMessageSummary 
+          v-if="lastBulkCsvId && csvProcessed" 
+          :bulkMessageCsvId="lastBulkCsvId" 
+          class="mt-4"
+        />
+
         <div class="d-flex gap-2 mt-4">
           <v-btn
             type="submit"
@@ -424,12 +430,61 @@
         Refresh
       </v-btn>
     </v-card-title>
+
+    <v-card-text v-if="selected.length > 0">
+      <div class="d-flex align-center mb-4">
+        <span class="text-subtitle-2 mr-4">{{ selected.length }} items selected</span>
+        <v-btn
+          color="warning"
+          size="small"
+          class="mr-2"
+          @click="bulkValidate"
+          :loading="bulkValidating"
+          :disabled="bulkValidating || !canBulkValidate"
+        >
+          <v-icon left>mdi-check-all</v-icon>
+          Validate Selected
+        </v-btn>
+        <v-btn
+          color="info"
+          size="small"
+          class="mr-2"
+          @click="bulkProcess"
+          :loading="bulkProcessing"
+          :disabled="bulkProcessing || !canBulkProcess"
+        >
+          <v-icon left>mdi-play-network</v-icon>
+          Process Selected
+        </v-btn>
+        <v-btn
+          color="success"
+          size="small"
+          class="mr-2"
+          @click="viewBulkSummary"
+          :disabled="!canViewBulkSummary"
+        >
+          <v-icon left>mdi-chart-box-outline</v-icon>
+          View Summaries
+        </v-btn>
+        <v-btn
+          color="error"
+          size="small"
+          @click="clearSelection"
+        >
+          <v-icon left>mdi-close</v-icon>
+          Clear Selection
+        </v-btn>
+      </div>
+    </v-card-text>
     
     <v-data-table
+      v-model="selected"
       :headers="bulkCsvHeaders"
       :items="bulkCsvs"
       :loading="loadingBulkCsvs"
       :items-per-page="10"
+      item-value="id"
+      show-select
       class="elevation-1"
     >
       <template v-slot:item.status="{ item }">
@@ -461,6 +516,7 @@
           color="primary"
           @click="viewBulkCsvDetails(item.id)"
           :loading="loadingDetails && selectedBulkCsvId === item.id"
+          :disabled="loadingDetails && selectedBulkCsvId === item.id"
         >
           <v-icon>mdi-eye</v-icon>
         </v-btn>
@@ -470,7 +526,8 @@
           size="small"
           color="warning"
           @click="validateBulkCsvById(item.id)"
-          :disabled="item.status !== BulkMessageCsvStatusEnum.INITIATED"
+          :disabled="item.status.toLowerCase() !== BulkMessageCsvStatusEnum.INITIATED.toLowerCase() || (validating && selectedBulkCsvId === item.id)"
+          :loading="validating && selectedBulkCsvId === item.id"
         >
           <v-icon>mdi-check-circle</v-icon>
         </v-btn>
@@ -480,9 +537,30 @@
           size="small"
           color="info"
           @click="processBulkCsvById(item.id)"
-          :disabled="item.status !== BulkMessageCsvStatusEnum.INITIATED"
+          :disabled="item.status.toLowerCase() !== BulkMessageCsvStatusEnum.INITIATED.toLowerCase() || (processing && selectedBulkCsvId === item.id)"
+          :loading="processing && selectedBulkCsvId === item.id"
         >
           <v-icon>mdi-play</v-icon>
+        </v-btn>
+        
+        <v-btn
+          icon
+          size="small"
+          color="success"
+          @click="viewBulkCsvSummary(item.id)"
+          :disabled="item.status.toLowerCase() !== BulkMessageCsvStatusEnum.COMPLETED.toLowerCase() && item.status.toLowerCase() !== BulkMessageCsvStatusEnum.PROCESSED.toLowerCase()"
+        >
+          <v-icon>mdi-chart-bar</v-icon>
+        </v-btn>
+        
+        <v-btn
+          icon
+          size="small"
+          color="secondary"
+          @click="downloadCsvFile(item)"
+          :disabled="!item.formated_url && !item.initial_url"
+        >
+          <v-icon>mdi-download</v-icon>
         </v-btn>
       </template>
       
@@ -494,6 +572,82 @@
       </template>
     </v-data-table>
   </v-card>
+  
+  <v-dialog v-model="showSummaryDialog" max-width="800px">
+    <v-card>
+      <v-card-title class="d-flex align-center">
+        <span>Message Distribution Summary</span>
+        <v-spacer></v-spacer>
+        <v-btn icon @click="showSummaryDialog = false">
+          <v-icon>mdi-close</v-icon>
+        </v-btn>
+      </v-card-title>
+      <v-card-text>
+        <BulkMessageSummary 
+          v-if="selectedBulkCsvId" 
+          :bulkMessageCsvId="selectedBulkCsvId" 
+        />
+      </v-card-text>
+    </v-card>
+  </v-dialog>
+
+  <v-dialog v-model="showBulkSummaryDialog" fullscreen>
+    <v-card>
+      <v-toolbar dark color="primary">
+        <v-btn icon dark @click="showBulkSummaryDialog = false">
+          <v-icon>mdi-close</v-icon>
+        </v-btn>
+        <v-toolbar-title>Bulk Message Summaries</v-toolbar-title>
+      </v-toolbar>
+      <v-card-text>
+        <v-tabs v-model="activeTab">
+          <v-tab v-for="item in selectedCompletedItems" :key="item.id" :value="item.id">
+            CSV #{{ item.id }}
+          </v-tab>
+        </v-tabs>
+        <v-window v-model="activeTab">
+          <v-window-item
+            v-for="item in selectedCompletedItems"
+            :key="item.id"
+            :value="item.id"
+          >
+            <v-card flat>
+              <v-card-title>
+                Summary for CSV #{{ item.id }}
+                <v-chip class="ml-2" :color="getStatusColor(item.status)" size="small">
+                  {{ item.status }}
+                </v-chip>
+              </v-card-title>
+              <v-card-subtitle>
+                {{ item.type === 'template' ? `Template: ${item.template?.label || 'N/A'}` : `Text message` }}
+                | Channel: {{ item.channel }}
+                | Created: {{ formatDate(item.created_at) }}
+              </v-card-subtitle>
+              <v-card-text>
+                <BulkMessageSummary :bulkMessageCsvId="item.id" />
+              </v-card-text>
+            </v-card>
+          </v-window-item>
+        </v-window>
+      </v-card-text>
+    </v-card>
+  </v-dialog>
+
+  <v-snackbar
+    v-model="showSnackbar"
+    :color="snackbarColor"
+    :timeout="3000"
+  >
+    {{ snackbarText }}
+    <template v-slot:actions>
+      <v-btn
+        variant="text"
+        @click="showSnackbar = false"
+      >
+        Close
+      </v-btn>
+    </template>
+  </v-snackbar>
 </template>
 
 <script lang="ts">
@@ -518,9 +672,13 @@ import {
   getBulkMessageCsvDetails,
   fetchBulkMessageCsvs,
 } from "../api";
+import BulkMessageSummary from "../components/BulkMessageSummary.vue";
 
 export default defineComponent({
   name: "BulkMessage",
+  components: {
+    BulkMessageSummary
+  },
   props: {
     environment: {
       type: Object,
@@ -561,6 +719,17 @@ export default defineComponent({
     const bulkCsvs = ref<BulkMessageCsvDetails[]>([]);
     const loadingBulkCsvs = ref(false);
     const selectedBulkCsvId = ref<number | null>(null);
+    const showSummaryDialog = ref(false);
+
+    const selected = ref<BulkMessageCsvDetails[]>([]);
+    const bulkValidating = ref(false);
+    const bulkProcessing = ref(false);
+    const showBulkSummaryDialog = ref(false);
+    const activeTab = ref<number | null>(null);
+    
+    const showSnackbar = ref(false);
+    const snackbarText = ref('');
+    const snackbarColor = ref('success');
     
     const bulkCsvHeaders = [
       { title: 'ID', key: 'id', sortable: true },
@@ -603,6 +772,28 @@ export default defineComponent({
       if (!formData.template_code) return null;
       return (
         templates.value.find((t) => t.code === formData.template_code) || null
+      );
+    });
+
+    const canBulkValidate = computed(() => {
+      return selected.value.some(
+        (item) => item.status.toLowerCase() === BulkMessageCsvStatusEnum.INITIATED.toLowerCase()
+      );
+    });
+
+    const canBulkProcess = computed(() => {
+      return selected.value.some(
+        (item) => item.status.toLowerCase() === BulkMessageCsvStatusEnum.INITIATED.toLowerCase()
+      );
+    });
+
+    const canViewBulkSummary = computed(() => {
+      return selectedCompletedItems.value.length > 0;
+    });
+
+    const selectedCompletedItems = computed(() => {
+      return selected.value.filter(
+        (item) => item.status.toLowerCase() === BulkMessageCsvStatusEnum.COMPLETED.toLowerCase()
       );
     });
 
@@ -690,6 +881,11 @@ export default defineComponent({
       await getCsvDetails();
     };
     
+    const viewBulkCsvSummary = (id: number) => {
+      selectedBulkCsvId.value = id;
+      showSummaryDialog.value = true;
+    };
+    
     const validateBulkCsvById = async (id: number) => {
       selectedBulkCsvId.value = id;
       lastBulkCsvId.value = id.toString();
@@ -714,7 +910,7 @@ export default defineComponent({
       validationResult.value = null;
 
       try {
-        await validateBulkMessageCsv(lastBulkCsvId.value);
+        const result = await validateBulkMessageCsv(lastBulkCsvId.value);
         validationResult.value = {
           valid: true,
           message: "CSV validation successful",
@@ -982,6 +1178,106 @@ export default defineComponent({
       }
     };
 
+    const downloadCsvFile = (item: BulkMessageCsvDetails) => {
+      const url = item.formated_url || item.initial_url;
+      if (url) {
+        window.open(url, '_blank');
+      }
+    };
+
+    const clearSelection = () => {
+      selected.value = [];
+    };
+
+    const bulkValidate = async () => {
+      if (selected.value.length === 0) return;
+
+      bulkValidating.value = true;
+      let successCount = 0;
+      let failCount = 0;
+
+      try {
+        const initiatedItems = selected.value.filter(
+          item => item.status.toLowerCase() === BulkMessageCsvStatusEnum.INITIATED.toLowerCase()
+        );
+
+        for (const item of initiatedItems) {
+          try {
+            await validateBulkMessageCsv(item.id);
+            successCount++;
+          } catch (error) {
+            failCount++;
+            console.error(`Failed to validate CSV #${item.id}:`, error);
+          }
+        }
+
+        showSnackbar.value = true;
+        if (failCount === 0) {
+          snackbarColor.value = 'success';
+          snackbarText.value = `Successfully validated ${successCount} CSV files.`;
+        } else {
+          snackbarColor.value = 'warning';
+          snackbarText.value = `Validated ${successCount} CSV files. Failed to validate ${failCount} CSV files.`;
+        }
+
+        await loadBulkMessageCsvs();
+      } catch (error) {
+        showSnackbar.value = true;
+        snackbarColor.value = 'error';
+        snackbarText.value = error instanceof Error ? error.message : 'An error occurred during bulk validation';
+      } finally {
+        bulkValidating.value = false;
+      }
+    };
+
+    const bulkProcess = async () => {
+      if (selected.value.length === 0) return;
+
+      bulkProcessing.value = true;
+      let successCount = 0;
+      let failCount = 0;
+
+      try {
+        const initiatedItems = selected.value.filter(
+          item => item.status.toLowerCase() === BulkMessageCsvStatusEnum.INITIATED.toLowerCase()
+        );
+
+        for (const item of initiatedItems) {
+          try {
+            await processBulkMessageCsv(item.id);
+            successCount++;
+          } catch (error) {
+            failCount++;
+            console.error(`Failed to process CSV #${item.id}:`, error);
+          }
+        }
+
+        showSnackbar.value = true;
+        if (failCount === 0) {
+          snackbarColor.value = 'success';
+          snackbarText.value = `Successfully started processing ${successCount} CSV files.`;
+        } else {
+          snackbarColor.value = 'warning';
+          snackbarText.value = `Started processing ${successCount} CSV files. Failed to process ${failCount} CSV files.`;
+        }
+
+        await loadBulkMessageCsvs();
+      } catch (error) {
+        showSnackbar.value = true;
+        snackbarColor.value = 'error';
+        snackbarText.value = error instanceof Error ? error.message : 'An error occurred during bulk processing';
+      } finally {
+        bulkProcessing.value = false;
+      }
+    };
+
+    const viewBulkSummary = () => {
+      if (selectedCompletedItems.value.length === 0) return;
+      
+      activeTab.value = selectedCompletedItems.value[0].id;
+      showBulkSummaryDialog.value = true;
+    };
+
     return {
       form,
       formData,
@@ -1032,6 +1328,25 @@ export default defineComponent({
       processBulkCsvById,
       selectedBulkCsvId,
       BulkMessageCsvStatusEnum,
+      showSummaryDialog,
+      viewBulkCsvSummary,
+      downloadCsvFile,
+      selected,
+      clearSelection,
+      bulkValidate,
+      bulkProcess,
+      viewBulkSummary,
+      bulkValidating,
+      bulkProcessing,
+      canBulkValidate,
+      canBulkProcess,
+      canViewBulkSummary,
+      showBulkSummaryDialog,
+      activeTab,
+      selectedCompletedItems,
+      showSnackbar,
+      snackbarText,
+      snackbarColor,
     };
   },
 });
