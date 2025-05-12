@@ -910,6 +910,7 @@ export default defineComponent({
       validationResult.value = null;
 
       try {
+        // @ts-ignore 
         const result = await validateBulkMessageCsv(lastBulkCsvId.value);
         validationResult.value = {
           valid: true,

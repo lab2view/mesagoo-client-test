@@ -128,4 +128,36 @@ export interface BulkMessageCsvDetails {
   user?: User;
 }
 
+export interface Country {
+  id: number;
+  name: string;
+  code: string;
+  operators: Operator[];
+  [key: string]: any;
+}
+
+export interface Operator {
+  id: number;
+  name: string;
+  code: string;
+  providers: Provider[];
+  [key: string]: any;
+}
+
+export interface Provider {
+  id: number;
+  name: string;
+  code: string;
+  sender_countries: SenderCountry[];
+  [key: string]: any;
+}
+
+export interface SenderCountry {
+  id: number;
+  name: string;
+  code: string;
+  COUNT: number;
+  [key: string]: any;
+}
+
 export type BulkMessageCsvSummary = Country;
